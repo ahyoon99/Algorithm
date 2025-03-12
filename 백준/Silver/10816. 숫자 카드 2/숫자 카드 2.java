@@ -4,26 +4,31 @@ import java.io.*;
 public class Main {
 	static int n;
 	static int m;
-	static int[] matrix1;
-	static int[] matrix2;
-	static HashMap<Integer, Integer> cnt;
+	static int[] matrix1;	// 상근이가 가지고 있는 숫자 카드 
+	static int[] matrix2;	// 개수를 구해야하는 숫자 카드 목록 
+	static HashMap<Integer, Integer> cnt;	// 결과(카드 개수)를 저장할 hashmap 
 
 	public static void main(String[] args) throws IOException{
+		// 입력 받기 
 		input();
+		
+		// 출력 순서를 유지하기 위해 배열 따로 복사해놓기 
 		int[] matrix2Copy = matrix2.clone();
 		
+		// 이분탐색을 위해 정렬하기 
 		Arrays.sort(matrix2);
 		
 		for(int i=0;i<n;i++) {
-			if(cnt.containsKey(matrix1[i])) {
+			if(cnt.containsKey(matrix1[i])) {	// 이미 존재하는 카드라면, 개수만 증가시켜주기 
 				int getCnt = cnt.get(matrix1[i]);
 				cnt.put(matrix1[i], getCnt+1);
 			}
-			else {
+			else {	// 존재하지 않는 카드라면, 탐색하기 
 				bs(matrix1[i]);
 			}
 		}
 		
+		// 결과 출력하기 
 		StringBuilder sb = new StringBuilder();
 		for(int i=0;i<m;i++) {
 			if(cnt.containsKey(matrix2Copy[i])) {
@@ -36,6 +41,7 @@ public class Main {
 		System.out.println(sb);
 	}
 	
+	// 이분탐색 
 	static void bs(int num) {
 		int start = 0;
 		int end = m-1;
@@ -43,20 +49,14 @@ public class Main {
 		
 		while(start<=end) {
 			mid = (start+end)/2;
-			if(matrix2[mid]==num) {
-				if(cnt.containsKey(matrix2[mid])) {
-					int getCnt = cnt.get(matrix2[mid]);
-					cnt.put(matrix2[mid], getCnt+1);
-				}
-				else {
-					cnt.put(matrix2[mid],  1);
-				}
+			if(matrix2[mid]==num) {	// 찾고자 하는 숫자를 찾은 경우 
+				cnt.put(matrix2[mid],  1);
 				return;
 			}
-			else if(matrix2[mid]<num) {
+			else if(matrix2[mid]<num) {	// 현재 탐색하는 값이 찾고자하는 숫자보다 작은 경우 
 				start=mid+1;
 			}
-			else if(matrix2[mid]>num) {
+			else if(matrix2[mid]>num) {	// 현재 탐색하는 값이 찾고자하는 숫자보다 큰 경우 
 				end=mid-1;
 			}
 		}
