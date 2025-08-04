@@ -1,0 +1,281 @@
+# docker-compose.prod.yml
+# 전체 SSAFY CICD 스택 (프로덕션 환경)
+
+version: '3.8'
+
+services:
+  # 백엔드 서비스 (Spring Boot)
+  backend:
+    image: ssafy-backend:${BACKEND_IMAGE_TAG:-latest}
+    container_name: ssafy-backend-new
+    environment:
+      # Spring 프로파일
+      SPRING_PROFILES_ACTIVE: prod
+      
+      # 데이터베이스 연결
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ssafy_project?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useUnicode=true
+      SPRING_DATASOURCE_USERNAME: ssafy_user
+      SPRING_DATASOURCE_PASSWORD: ssafy_password123
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+      
+      # JPA 설정
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: false
+      SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.MySQL8Dialect
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.MySQL8Dialect
+      
+      # Redis 연결
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ssafy_redis123
+      SPRING_REDIS_TIMEOUT: 2000ms
+      
+      # 서버 설정
+      SERVER_PORT: 8081
+      
+      # 로깅 설정
+      LOGGING_LEVEL_COM_SSAFY: INFO
+      LOGGING_LEVEL_ROOT: WARN
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - ssafy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # 프론트엔드 서비스 (Vue.js + Nginx)
+  frontend:
+    image: ssafy-frontend:${FRONTEND_IMAGE_TAG:-latest}
+    container_name: ssafy-frontend-new
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ssafy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # MySQL 데이터베이스
+  mysql:
+    image: mysql:8.0
+    container_name: ssafy-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ssafy123!@#
+      MYSQL_DATABASE: ssafy_project
+      MYSQL_USER: ssafy_user
+      MYSQL_PASSWORD: ssafy_password123
+      MYSQL_ROOT_HOST: '%'
+    ports:
+      - "13306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./infrastructure/mysql/init:/docker-entrypoint-initdb.d
+      - ./infrastructure/mysql/conf:/etc/mysql/conf.d
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password
+              --character-set-server=utf8mb4
+              --collation-server=utf8mb4_unicode_ci
+              --innodb-buffer-pool-size=256M
+    networks:
+      - ssafy-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "ssafy_user", "-pssafy_password123"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Redis 캐시
+  redis:
+    image: redis:7-alpine
+    container_name: ssafy-redis
+    environment:
+      REDIS_PASSWORD: ssafy_redis123
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+      - ./infrastructure/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ssafy_redis123
+    networks:
+      - ssafy-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "ssafy_redis123", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Nginx 리버스 프록시
+  nginx:
+    image: nginx:alpine
+    container_name: ssafy-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./infrastructure/nginx/ssl:/etc/nginx/ssl
+      - ./infrastructure/nginx/logs:/var/log/nginx
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+    networks:
+      - ssafy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # 모니터링 - Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ssafy-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - ssafy-network
+
+  # 모니터링 - Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ssafy-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ssafy_grafana123
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./infrastructure/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - ssafy-network
+
+  # Jenkins CI/CD
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: ssafy-jenkins
+    privileged: true
+    user: root
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./infrastructure/jenkins/casc.yaml:/var/jenkins_home/casc_configs/jenkins.yaml
+    restart: unless-stopped
+    networks:
+      - ssafy-network
+
+  # SonarQube 코드 품질 검사
+  sonarqube:
+    image: sonarqube:community
+    container_name: ssafy-sonarqube
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://postgres:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonarqube
+      SONAR_JDBC_PASSWORD: ssafy_sonar123
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - ssafy-network
+
+  # PostgreSQL for SonarQube
+  postgres:
+    image: postgres:13
+    container_name: ssafy-postgres
+    environment:
+      POSTGRES_DB: sonarqube
+      POSTGRES_USER: sonarqube
+      POSTGRES_PASSWORD: ssafy_sonar123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - ssafy-network
+
+  # Portainer 컨테이너 관리
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: ssafy-portainer
+    ports:
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    restart: unless-stopped
+    networks:
+      - ssafy-network
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  jenkins_data:
+    driver: local
+  sonarqube_data:
+    driver: local
+  sonarqube_extensions:
+    driver: local
+  sonarqube_logs:
+    driver: local
+  postgres_data:
+    driver: local
+  portainer_data:
+    driver: local
+
+networks:
+  ssafy-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
