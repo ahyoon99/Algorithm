@@ -5,9 +5,10 @@ public class Main {
 	static int H;
 	static int W;
 	static char[][] matrix;
-	static boolean[][] isNearBlock;
 	static Node S;
 	static Node E;
+	
+	static boolean[][] isNearBlock;	// 벽에 인접한 칸인지 체크하고 boolean 값으로 저장
 	
 	static int[] dx = {-1,0,1,0};
 	static int[] dy = {0,1,0,-1};
@@ -34,7 +35,7 @@ public class Main {
 	}
 	
 	static void solution() {
-		int[][] times = new int[H][W];
+		int[][] times = new int[H][W];	// 이동하는 데 걸리는 최소 시간 저장할 배열
 		for(int i=0;i<times.length;i++) {
 			Arrays.fill(times[i], Integer.MAX_VALUE);
 		}
@@ -56,12 +57,12 @@ public class Main {
 					continue;
 				}
 				
-				int nextTime = -1;
 				if(matrix[nx][ny]!='#') {	// 다음 칸이 벽이 아닌 경우
-					if(isNearBlock[x][y] && isNearBlock[nx][ny]) {	// 다음 칸이 벽에 인접한 칸일 경우, 이동 시간 update
+					int nextTime = -1;	// 다음 칸의 이동 시간을 저장할 변수 
+					if(isNearBlock[x][y] && isNearBlock[nx][ny]) {	// 현재 칸과 다음 칸이 벽에 인접한 칸일 경우, 이동 시간 update
 						nextTime = time;
 					}
-					else {			// 다음 칸이 벽에 인접하지 않을 칸일 경우, 이동 시간 update
+					else {			// 현재 칸과 다음 칸 중 하나라도 벽에 인접하지 않을 칸일 경우, 이동 시간 update
 						nextTime = time+1;
 					}
 					
@@ -105,6 +106,7 @@ public class Main {
 			}
 		}
 		
+		// 벽에 인접한 칸인지 체크하기
 		isNearBlock = new boolean[H][W];
 		for(int i=0;i<H;i++) {
 			for(int j=0;j<W;j++) {
