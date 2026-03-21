@@ -7,9 +7,22 @@ class Solution {
         result = 0;
         int[] op = new int[numbers.length];
         
-        go(op, 0, numbers, target);
+        // go(op, 0, numbers, target);
+        dfs(numbers, 0, target, 0);
         
         return result;
+    }
+    
+    static public void dfs(int[] numbers, int idx, int target, int sum){
+        if(idx>=numbers.length){
+            if(target==sum){
+                result++;
+            }
+            return;
+        }
+        
+        dfs(numbers, idx+1, target, sum+numbers[idx]);
+        dfs(numbers, idx+1, target, sum-numbers[idx]);
     }
     
     static public void go(int[] op, int idx, int[] numbers, int target){
