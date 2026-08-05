@@ -3,38 +3,47 @@ import java.util.*;
 class Solution {
     static int n;
     static int[][] computers;
-    static boolean[] visited;
-    static int answer;
+    static boolean[] area;
     
     public int solution(int n, int[][] computers) {
+        int answer = 0;
+        
         this.n = n;
+        
+        this.computers = new int[n][n];
+        this.area = new boolean[n];
+        
         this.computers = computers;
-        visited = new boolean[n];
-        answer = 0;
+        
         
         for(int i=0;i<n;i++){
-            if(!visited[i]){
-                answer++;
+            if(area[i]==false){
                 bfs(i);
-            }            
+                answer++;
+            }
         }
-    
+        
         return answer;
     }
     
-    static void bfs(int num){
+    public void bfs(int x){
         Queue<Integer> q = new LinkedList<>();
-        q.add(num);
-        visited[num]=true;
+        q.add(x);
+        area[x] = true;
         
         while(!q.isEmpty()){
-            num = q.poll();
+            x = q.poll();
+            
             for(int i=0;i<n;i++){
-                if(computers[num][i]==1 && visited[i]==false){
+                if(x==i){
+                    continue;
+                }
+                if(computers[x][i]==1 && area[i]==false){
                     q.add(i);
-                    visited[i]=true;
+                    area[i]=true;
                 }
             }
         }
+        
     }
 }
