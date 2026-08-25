@@ -16,10 +16,12 @@ class Solution {
             this.dist = dist;
         }
         
+        @Override
         public int compareTo(Node next){
             return Integer.compare(this.dist, next.dist);
         }
     }
+    
     
     public int solution(int N, int[][] road, int K) {
     
@@ -41,8 +43,7 @@ class Solution {
         distance = new int[N+1];
         Arrays.fill(distance, Integer.MAX_VALUE);
         
-        dij();
-        
+        dijkstra();
         
         int result = 0;
         for(int i=1;i<=N;i++){
@@ -53,10 +54,10 @@ class Solution {
         return result;
     }
     
-    static void dij(){
+    static void dijkstra(){
         PriorityQueue<Node> pq = new PriorityQueue<>();
         pq.add(new Node(1, 0));
-        distance[1] = 0;
+        distance[1]=0;
         
         while(!pq.isEmpty()){
             Node node = pq.poll();
@@ -65,7 +66,7 @@ class Solution {
             
             for(int i=1;i<=N;i++){
                 if(matrix[num][i]!=Integer.MAX_VALUE && distance[i]>dist+matrix[num][i]){
-                    distance[i] = dist+matrix[num][i];
+                    distance[i] = dist + matrix[num][i];
                     pq.add(new Node(i, distance[i]));
                 }
             }
